@@ -1,10 +1,12 @@
-package ポーカー;
+package game;
 
 import java.util.InputMismatchException;
 import java.util.Scanner;
 
+
+
 public class Retry {
-	
+
 	//どのゲームか指定するためのゲームインターフェイス
 	private Game game;
 	
@@ -61,5 +63,6 @@ public class Retry {
 
 		}
 	}
+
 
 }
