@@ -1,4 +1,6 @@
-package ポーカー;
+package poker;
+
+import game.Retry;
 
 public class Main {
 	public static void main(String[] args){
