@@ -1,5 +1,6 @@
 package poker.logic;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -10,22 +11,135 @@ public class HandRank {
     private List<Card> hand;
 
     public HandRank(Player p) {
-        this.hand = p.getHand();
-        Collections.sort(hand); // ランク順にソート
+        this.hand = new ArrayList<>(p.getHand());
+        Collections.sort(hand); // CardクラスにComparableが実装されている前提
+    }
+
+    public HandRank(List<Card> hand) {
+        this.hand = new ArrayList<>(hand);
+        Collections.sort(hand);
+    }
+
+    public int judge() {
+        if (isFlush() && isStraight() && hand.get(0).getRank() == 10) return 0;
+        if (isFlush() && isStraight()) return 1;
+        if (isFourCard()) return 2;
+        if (isFullHouse()) return 3;
+        if (isFlush()) return 4;
+        if (isStraight()) return 5;
+        if (isThreeCard()) return 6;
+        if (isTwoPair()) return 7;
+        if (isOnePair()) return 8;
+        return 9;
+    }
+
+    public String getHandName() {
+        switch (judge()) {
+            case 0: return "ロイヤルフラッシュ";
+            case 1: return "ストレートフラッシュ";
+            case 2: return "フォーカード";
+            case 3: return "フルハウス";
+            case 4: return "フラッシュ";
+            case 5: return "ストレート";
+            case 6: return "スリーカード";
+            case 7: return "ツーペアー";
+            case 8: return "ワンペアー";
+            case 9: return "ノーペアー（ハイカード）";
+            default: return "不明";
+        }
+    }
+
+    public List<Integer> getKeyRanks() {
+        List<Integer> keyRanks = new ArrayList<>();
+        int[] rankCount = new int[15];
+        for (Card card : hand) {
+            rankCount[card.getRank()]++;
+        }
+
+        int rank = judge();
+        switch (rank) {
+            case 0: case 1: case 5:
+                keyRanks.add(hand.get(hand.size() - 1).getRank());
+                break;
+            case 2:
+                for (int i = 2; i <= 14; i++) {
+                    if (rankCount[i] == 4) {
+                        keyRanks.add(i);
+                        break;
+                    }
+                }
+                break;
+            case 3:
+                for (int i = 14; i >= 2; i--) {
+                    if (rankCount[i] == 3) keyRanks.add(i);
+                }
+                for (int i = 14; i >= 2; i--) {
+                    if (rankCount[i] == 2) keyRanks.add(i);
+                }
+                break;
+            case 4: case 9:
+                for (int i = hand.size() - 1; i >= 0; i--) {
+                    keyRanks.add(hand.get(i).getRank());
+                }
+                break;
+            case 6:
+                for (int i = 14; i >= 2; i--) {
+                    if (rankCount[i] == 3) {
+                        keyRanks.add(i);
+                        break;
+                    }
+                }
+                break;
+            case 7:
+                List<Integer> pairs = new ArrayList<>();
+                for (int i = 14; i >= 2; i--) {
+                    if (rankCount[i] == 2) pairs.add(i);
+                }
+                keyRanks.add(pairs.get(0));
+                keyRanks.add(pairs.get(1));
+                for (int i = 14; i >= 2; i--) {
+                    if (rankCount[i] == 1) {
+                        keyRanks.add(i);
+                        break;
+                    }
+                }
+                break;
+            case 8: // ワンペア
+                int pairRank = 0;
+                for (int i = 14; i >= 2; i--) {
+                    if (rankCount[i] == 2) {
+                        pairRank = i;
+                        keyRanks.add(i);
+                        break;
+                    }
+                }
+                List<Integer> kickers = new ArrayList<>();
+                for (int i = 14; i >= 2; i--) {
+                    if (rankCount[i] == 1) kickers.add(i);
+                }
+                Collections.sort(kickers, Collections.reverseOrder()); // キッカーを降順に
+                keyRanks.addAll(kickers);
+                break;
+        }
+        return keyRanks;
+    }
+
+    // デバッグ用に手札とキー情報を表示
+    public void printDebugInfo(String playerName) {
+        System.out.println(playerName + " の手札: " + hand);
+        System.out.println("役: " + getHandName());
+        System.out.println("キー: " + getKeyRanks());
     }
 
     public boolean isFlush() {
         String firstSuit = hand.get(0).getSuit();
         for (Card card : hand) {
-            if (!card.getSuit().equals(firstSuit)) {
-                return false;
-            }
+            if (!card.getSuit().equals(firstSuit)) return false;
         }
         return true;
     }
 
     public boolean isStraight() {
-        // 通常のストレートチェック
         boolean normalStraight = true;
         for (int i = 1; i < hand.size(); i++) {
             if (hand.get(i).getRank() != hand.get(i - 1).getRank() + 1) {
@@ -33,128 +147,51 @@ public class HandRank {
                 break;
             }
         }
-        if (normalStraight) {
-            return true;
-        }
-
-        // A-2-3-4-5 の特別なケースをチェック
-        if (hand.get(0).getRank() == 2 && 
-            hand.get(1).getRank() == 3 && 
-            hand.get(2).getRank() == 4 && 
-            hand.get(3).getRank() == 5 && 
-            hand.get(4).getRank() == 14) {
-            return true;
-        }
+        if (normalStraight) return true;
+        if (hand.get(0).getRank() == 2 && hand.get(1).getRank() == 3 &&
+            hand.get(2).getRank() == 4 && hand.get(3).getRank() == 5 &&
+            hand.get(4).getRank() == 14) return true;
         return false;
     }
 
-    public boolean isFourCard() {
-        return hasSameRank(4);
-    }
-
-    public boolean isThreeCard() {
-        return hasSameRank(3);
-    }
-
-    public boolean isOnePair() {
-        return hasSameRank(2);
-    }
+    public boolean isFourCard() { return hasSameRank(4); }
+    public boolean isThreeCard() { return hasSameRank(3); }
+    public boolean isOnePair() { return hasSameRank(2); }
 
     public boolean isTwoPair() {
         int pairCount = 0;
         for (int i = 0; i < hand.size() - 1; i++) {
             if (hand.get(i).getRank() == hand.get(i + 1).getRank()) {
                 pairCount++;
-                i++; // 連続するペアをカウントしたら、次のチェックをスキップ
+                i++;
             }
         }
         return pairCount == 2;
     }
 
     public boolean isFullHouse() {
-        int[] rankCount = new int[15]; // 2〜14のランクを格納するため（index 2〜14を使用）
-
-        // 各ランクのカードの枚数をカウント
+        int[] rankCount = new int[15];
         for (Card card : hand) {
             rankCount[card.getRank()]++;
         }
-
-        boolean hasThree = false;
-        boolean hasTwo = false;
-
+        boolean hasThree = false, hasTwo = false;
         for (int count : rankCount) {
-            if (count == 3) {
-                hasThree = true;
-            } else if (count == 2) {
-                hasTwo = true;
-            }
+            if (count == 3) hasThree = true;
+            else if (count == 2) hasTwo = true;
         }
-
         return hasThree && hasTwo;
     }
 
-
-    // 指定した枚数の同じランクが存在するかチェック
     private boolean hasSameRank(int count) {
-        int matchCount = 1; // 1枚目からカウント開始
+        int matchCount = 1;
         for (int i = 1; i < hand.size(); i++) {
             if (hand.get(i).getRank() == hand.get(i - 1).getRank()) {
                 matchCount++;
-                if (matchCount == count) {
-                    return true;
-                }
+                if (matchCount == count) return true;
             } else {
-                matchCount = 1; // 連続が途切れたらリセット
+                matchCount = 1;
             }
         }
         return false;
-    }
-
-    public int judge() {
-        if (isFlush() && isStraight() && hand.get(0).getRank() == 10) {
-            System.out.println("ロイヤルフラッシュ");
-            return 0;
-        }
-        if (isFlush() && isStraight()) {
-            System.out.println("ストレートフラッシュ");
-            return 1;
-        }
-        if (isFourCard()) {
-            System.out.println("フォーカード");
-            return 2;
-        }
-        if (isFullHouse()) {
-            System.out.println("フルハウス");
-            return 3;
-        }
-        if (isFlush()) {
-            System.out.println("フラッシュ");
-            return 4;
-        }
-        if (isStraight()) {
-            System.out.println("ストレート");
-            return 5;
-        }
-        if (isThreeCard()) {
-            System.out.println("スリーカード");
-            return 6;
-        }
-        if (isTwoPair()) {
-            System.out.println("ツーペアー");
-            return 7;
-        }
-        if (isOnePair()) {
-            System.out.println("ワンペアー");
-            return 8;
-        }
-        System.out.println("ノーペアー（ハイカード）");
-        return 9;
-    }
-    
-    
-    // テスト用、直接 List<Card> を渡せるコンストラクタを追加
-    public HandRank(List<Card> hand) {
-        this.hand = hand;
-        Collections.sort(this.hand); // ランク順にソート
     }
 }
